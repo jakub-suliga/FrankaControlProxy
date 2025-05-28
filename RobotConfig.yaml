@@ -1,0 +1,3 @@
+RobotIP: 172.16.2.2
+PublisherAddr: tcp://141.3.53.152:5555
+ServiceAddr: tcp://141.3.53.152:5556
