@@ -23,7 +23,7 @@ struct FrankaArmState {
     bool is_connected;                          // Connection status
     
     // Thread safety
-    mutable std::mutex state_mutex;
+    mutable std::mutex mutex;
     
     // Default constructor
     FrankaArmState() 
@@ -37,16 +37,22 @@ struct FrankaArmState {
         , is_connected(false) {
     }
     
-    // Update state from franka::RobotState
+    // TODO: Update state from franka::RobotState
     void updateState(const franka::RobotState& robot_state);
 
     // Serialize to JSON string
-    char serialize();
+    char encode();
     
     // Static function to deserialize from JSON string
     static FrankaArmState deserialize(const char json_str);
-    
-
 };
+
+// TODO: implement FrankaGripperState
+struct FrankaGripperState
+{
+    /* data */
+};
+
+
 
 #endif // FRANKA_ARM_STATE_HPP

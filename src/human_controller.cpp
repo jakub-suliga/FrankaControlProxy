@@ -45,10 +45,7 @@ int main(int argc, char **argv)
     // Read config file
     franka::Robot robot(robot_ip);
     franka::Gripper gripper(robot_ip);
-    robot.setCollisionBehavior({{100.0, 100.0, 100.0, 100.0, 100.0, 300.0, 300.0}},
-                               {{100.0, 100.0, 100.0, 100.0, 100.0, 300.0, 300.0}},
-                               {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
-                               {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}});
+
     franka::Model model = robot.loadModel();
     struct
     {
