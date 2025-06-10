@@ -1,0 +1,53 @@
+name: C++ Build & Python Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Setup C++ toolchain
+      run: sudo apt-get update && sudo apt-get install -y \
+            build-essential cmake
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pyzmq
+
+    - name: Build C++ server
+      run: |
+        mkdir -p build
+        cd build
+        cmake ..
+        make -j$(nproc)
+
+    - name: Start server in background
+      run: |
+        cd build
+        ./your_server_binary --port 5556 &
+        echo "SERVER_PID=$!" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Wait for server to be ready
+      run: sleep 5
+
+    - name: Run Python tests
+      run: |
+        cd test
+        pytest --maxfail=1 --disable-warnings -q
+
+    - name: Stop server
+      run: kill $SERVER_PID
+      if: always()
