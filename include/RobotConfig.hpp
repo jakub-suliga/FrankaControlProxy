@@ -35,15 +35,18 @@ public:
     }
 
     // Function to get a value as a string
-    std::string getValue(const std::string& key) const {
+
+    std::string getValue(const std::string& key, const std::string& default_value = "") const {
         auto it = config_data.find(key);
         if (it != config_data.end()) {
             return it->second;
         } else {
-            std::cerr << "Warning: Key not found in config: " << key << std::endl;
-            return "";
+        std::cerr << "Warning: Key not found in config: " << key << ", using default: " << default_value << std::endl;
+        return default_value;
         }
-    }
+    }   
+
+    
 
     // Function to display the loaded configuration
     void display() const {
