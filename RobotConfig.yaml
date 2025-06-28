@@ -1,4 +1,4 @@
-RobotIP: 172.16.2.2
-PublisherAddr: tcp://141.3.53.152:5555
-ServiceAddr: tcp://141.3.53.152:5556
+robot_ip: 172.16.2.2
+state_pub_addr: tcp://141.3.53.152:5555
+service_addr: tcp://141.3.53.152:5556
 useGripper: true
