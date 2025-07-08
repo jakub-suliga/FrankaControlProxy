@@ -11,7 +11,7 @@
 #include <franka/exception.h>
 #include <iostream>
 
-class IdleControlMode : public AbstractControlMode {
+class ZeroTorqueMode : public AbstractControlMode {
 public:
     ZeroTorqueMode() = default;
     ~ZeroTorqueMode() override = default;
@@ -19,6 +19,6 @@ public:
     //void initialize(const franka::RobotState& initial_state) override;
     void start() override;
     void stop() override;
-}
+};
 
-#endif // IDLE_CONTROL_MODE_H
+#endif // ZERO_TORQUE_MODE_HPP

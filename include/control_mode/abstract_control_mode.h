@@ -62,7 +62,8 @@ protected:
     franka::RobotState current_state_;
     mutable std::mutex state_mutex_;
     bool is_running_ = false;
-
+    std::shared_ptr<franka::RobotState> leader_state_;
+    mutable std::mutex leader_mutex_; // Protects access to leader_state_
 };
 
 #endif // ABSTRACT_CONTROL_MODE_H

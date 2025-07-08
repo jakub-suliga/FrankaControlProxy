@@ -18,14 +18,17 @@ static void signalHandler(int signum) {
     std::cout << "\n[INFO] Caught signal " << signum << ", shutting down..." << std::endl;
     running_flag = false;
 }
-franka::RobotState default_state;
-default_state.q = {{0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785}};  // 默认初始位置
-default_state.O_T_EE = {{
-    1.0, 0.0, 0.0, 0.3,
-    0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, 1.0, 0.5,
-    0.0, 0.0, 0.0, 1.0
-}};
+franka::RobotState default_state = []{
+    franka::RobotState state;
+    state.q = {{0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785}};  //default joint positions
+    state.O_T_EE = {{
+        1.0, 0.0, 0.0, 0.3,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.5,
+        0.0, 0.0, 0.0, 1.0
+    }};
+    return state;
+}();
 
 
 ////main Proxy
@@ -42,7 +45,7 @@ void FrankaProxy::initialize(const std::string& filename) {
     RobotConfig config(filename);
     type_ = config.getValue("type", "Arm"); // Default to "Arm" if not specified
     robot_ip_ = config.getValue("robot_ip");
-    follower_ = config.getValue("follower", false); // Default to false if not specified
+    follower_ = config.getValue("follower"); 
     rep_socket_.set(zmq::sockopt::rcvtimeo, SOCKET_TIMEOUT_MS);
     sub_socket_.set(zmq::sockopt::rcvtimeo, SOCKET_TIMEOUT_MS);
     if (type_ == "Arm")
@@ -53,7 +56,7 @@ void FrankaProxy::initialize(const std::string& filename) {
         rep_socket_.bind(service_addr_);
         robot_ = std::make_shared<franka::Robot>(robot_ip_);
         model_ = std::make_shared<franka::Model>(robot_->loadModel());
-        if(follower_){
+        if(follower_ == "true" || follower_ == "True"){
             state_sub_addr_ = config.getValue("state_sub_addr");
             std::cout << "[FrankaProxy] Initializing Arm Follower Proxy with IP: " << robot_ip_ << std::endl;
             sub_socket_.connect(state_sub_addr_);
@@ -70,7 +73,7 @@ void FrankaProxy::initialize(const std::string& filename) {
         service_addr_ = config.getValue("service_addr");
         rep_socket_.bind(service_addr_);
         gripper_ = std::make_shared<franka::Gripper>(robot_ip_);
-        if(follower_){
+        if(follower_ == "true" || follower_ == "True"){
             gripper_sub_addr_ = config.getValue("gripper_sub_addr");
             std::cout << "[FrankaProxy] Initializing Gripper Follower Proxy with IP: " << robot_ip_ << std::endl;
             sub_socket_.connect(gripper_sub_addr_);
@@ -96,16 +99,16 @@ FrankaProxy::~FrankaProxy() {
 ////basic function
 //start and initialize threads
 bool FrankaProxy::start() {
-    in_control_ = True;
+    in_control_ = true;
     if (type_ == "Arm") {
-        if(follower_) {
+        if(follower_ == "true" || follower_ == "True") {
             state_sub_thread_ = std::thread(&FrankaProxy::stateSubscribeThread, this);
             std::cout << "done arm sub"<< std::endl;
         } 
         return startArm();
         
     } else if (type_ == "Gripper") {
-        if(follower_) {
+        if(follower_ == "true" || follower_ == "True") {
             gripper_sub_thread_ = std::thread(&FrankaProxy::gripperSubscribeThread, this);
             std::cout << "done gripper sub"<< std::endl;
         }
@@ -141,6 +144,7 @@ bool FrankaProxy::startGripper() {
     std::cout << "done gripper pub"<< std::endl;
     service_thread_ = std::thread(&FrankaProxy::responseSocketThread, this);
     std::cout << "done service"<< std::endl;
+    return true;
 }
 
 //stop sever and clean up resource
@@ -148,13 +152,12 @@ void FrankaProxy::stop() {
     std::cout << "[INFO] Stopping FrankaProxy...\n";
     if (type_ == "Arm") {
         return stopArm();
-        std::cout << "[INFO] Shutdown complete.\n"
+        std::cout << "[INFO] Shutdown complete.\n";
     } else if (type_ == "Gripper") {
         return stopGripper();
-        std::cout << "[INFO] Shutdown complete.\n"
+        std::cout << "[INFO] Shutdown complete.\n";
     } else {
         std::cerr << "[ERROR] Unsupported type: " << type_ << std::endl;
-        return false;
     }
 }
 
@@ -222,8 +225,7 @@ franka::RobotState FrankaProxy::getCurrentState() {
 }
 //get current gripper state
 protocol::FrankaGripperState FrankaProxy::getCurrentGripper(){
-    franka::Gripper gripper(gripper_);
-    franka::GripperState gripper_state = gripper.readOnce();
+    franka::GripperState gripper_state = gripper_->readOnce();
     protocol::FrankaGripperState proto_gripper_state = protocol::FrankaGripperState::fromGripperState(gripper_state);
     return proto_gripper_state;
 }
@@ -282,13 +284,16 @@ void FrankaProxy::stateSubscribeThread() {
     while (in_control_) {
         try{
             zmq::message_t message;
-            sub_socket_.recv(message, zmq::recv_flags::none);
+            auto result = sub_socket_.recv(message, zmq::recv_flags::none);
+            if (!result) {
+                std::cerr << "[FrankaProxy] Failed to receive state message." << std::endl;
+                continue; // Skip this iteration if no message received
+            }
             std::vector<uint8_t> data(static_cast<uint8_t*>(message.data()), static_cast<uint8_t*>(message.data()) + message.size());
             // Debug: Print the received message size
             std::cout << "[FrankaProxy] Received state update: size = " << data.size() << std::endl;
             protocol::FrankaArmState arm_state;
-            if(bool decodeStateMessage(data, arm_state))
-            {
+            if (protocol::decodeStateMessage(data, arm_state)) {
                 leader_state_ = arm_state.toRobotState(); // Convert to RobotState for follower
                 {
                     std::lock_guard<std::mutex> lock(control_mutex_);
@@ -313,7 +318,8 @@ void FrankaProxy::gripperSubscribeThread() {
     sub_socket_.set(zmq::sockopt::subscribe, ""); // Subscribe to all messages 
     try{
         zmq::message_t message;
-        sub_socket_.recv(message, zmq::recv_flags::none);
+        auto result = sub_socket_.recv(message, zmq::recv_flags::none);
+        if(!result) std::cerr << "[FrankaProxy] Failed to receive gripper message." << std::endl;
         std::vector<uint8_t> data(static_cast<uint8_t*>(message.data()), static_cast<uint8_t*>(message.data()) + message.size());
         // Debug: Print the received message size
         std::cout << "[FrankaProxy] Received gripper update: size = " << data.size() << std::endl;
@@ -326,7 +332,6 @@ void FrankaProxy::gripperSubscribeThread() {
         }
     }catch (const zmq::error_t& e) {
         std::cerr << "[FrankaProxy] ZMQ recv error: " << e.what() << std::endl;
-        break;
     }
 }
 
@@ -397,7 +402,7 @@ void FrankaProxy::responseSocketThread() {
         if (!rep_socket_.recv(request, zmq::recv_flags::none)) continue;//skip,if fail
         
         std::vector<uint8_t> req_data(static_cast<uint8_t*>(request.data()),//begin
-                                      static_cast<uint8_t*>(request.data()) + request.size())//end;
+                                      static_cast<uint8_t*>(request.data()) + request.size());//end
         std::cout << "[FrankaProxy] Received request: msg size = " << req_data.size() << std::endl;
 
         //std::string response;
@@ -430,6 +435,7 @@ void FrankaProxy::handleServiceRequest(const std::vector<uint8_t>& request, std:
     
     const uint8_t* payload = data + 4;
     std::vector<uint8_t> resp;
+    uint8_t command = payload[0];
     //deal with different kinds of msg
     switch (header.id) {
         case static_cast<int> (protocol::MsgID::GET_STATE_REQ):
@@ -472,7 +478,7 @@ void FrankaProxy::handleServiceRequest(const std::vector<uint8_t>& request, std:
                 }
                 // todo:implement gripper command handling with function
                 //just the test:
-                uint8_t command = payload[0];
+                
                 if (command == 0) { // Example command, replace with actual logic
                     gripper_->stop(); // Stop the gripper
                     std::cout << "Gripper stop command received." << std::endl;
@@ -487,6 +493,7 @@ void FrankaProxy::handleServiceRequest(const std::vector<uint8_t>& request, std:
             break;
     }
 
-    response.assign(reinterpret_cast<const char*>(resp.data()), resp.size());
+    //response.assign(reinterpret_cast<const char*>(resp.data()), resp.size());
+    response = resp;
 }
 }

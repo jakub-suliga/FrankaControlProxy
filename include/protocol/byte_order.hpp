@@ -19,9 +19,11 @@ constexpr bool is_little_endian() {
 
 #if defined(_MSC_VER)
     #include <intrin.h>
+    #define bswap16 _byteswap_ushort
     #define bswap32 _byteswap_ulong
     #define bswap64 _byteswap_uint64
 #else
+    #define bswap16 __builtin_bswap16
     #define bswap32 __builtin_bswap32
     #define bswap64 __builtin_bswap64
 #endif
@@ -58,8 +60,9 @@ inline uint16_t from_big_endian_u16(uint16_t val) {
 #else
     return val;
 #endif
+}
 
-//double 
+ //double 
 inline double to_big_endian_f64(double val) {
     static_assert(sizeof(double) == 8, "Unexpected double size");
 #if defined(_WIN32) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)

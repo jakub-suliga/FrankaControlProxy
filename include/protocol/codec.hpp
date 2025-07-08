@@ -5,6 +5,7 @@
 #include "protocol/msg_id.hpp"
 #include "protocol/franka_arm_state.hpp"
 #include "protocol/franka_gripper_state.hpp"
+#include "protocol/mode_id.hpp"
 #include <cstdint>
 #include <cstring>
 #include <array>
@@ -117,9 +118,11 @@ std::vector<uint8_t> encodeMessage(const MessageHeader& header, const std::vecto
 std::vector<uint8_t> encodeStateMessage(const FrankaArmState& state);
 std::vector<uint8_t> encodeModeMessage(uint8_t mode_code);
 std::vector<uint8_t> encodeErrorMessage(uint8_t error_code);
-std::vector<uint8_t> encodeGripperMessage(const FrankaGripperState& gripper_state) 
+std::vector<uint8_t> encodeGripperMessage(const FrankaGripperState& gripper_state);
 bool decodeStateMessage(const std::vector<uint8_t>& data, FrankaArmState& arm_state);
-bool decodeGripperMessage(const std::vector<uint8_t>& data, FrankaGripperState& gripper_state)
+bool decodeGripperMessage(const std::vector<uint8_t>& data, FrankaGripperState& gripper_state);
+std::vector<uint8_t> encodeStartControlResp(bool success, ModeID mode_id);
+
 
 
 

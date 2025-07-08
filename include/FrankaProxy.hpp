@@ -11,9 +11,11 @@
 #include <franka/robot.h>
 #include <franka/model.h>
 #include <franka/robot_state.h>
+#include <franka/gripper.h>
 #include <yaml-cpp/yaml.h>
 #include "protocol/franka_arm_state.hpp"
 #include "control_mode/abstract_control_mode.h"
+#include "protocol/franka_gripper_state.hpp"
 
 class FrankaProxy {
 
@@ -29,7 +31,7 @@ public:
     std::string getType() const { return type_; } // Returns the type of the proxy (e.g., "Arm" or "Gripper")
     // State management
     franka::RobotState getCurrentState();// Return the current state of the robot
-    protocol::FrankaGripperState FrankaProxy::getCurrentGripper();// Return the current state of the gripper
+    protocol::FrankaGripperState getCurrentGripper();// Return the current state of the gripper
     // Mode management
     void registerControlMode(const std::string& mode, std::unique_ptr<AbstractControlMode> control_mode);//register the map
     void setControlMode(const std::string& mode);
@@ -42,15 +44,21 @@ public:
 private:
     // Initialization
     void initialize(const std::string &filename);// Initializes the FrankaProxy with the given configuration file and set up communication sockets
-
+    //Start
+    bool startArm();// Starts the arm control loop and initializes the necessary threads
+    bool startGripper();// Starts the gripper control loop and initializes the necessary threads
+    //Stop
+    void stopArm();// Stops the arm control loop and cleans up resources
+    void stopGripper();// Stops the gripper control loop and cleans up resources
     // Thread functions
     void statePublishThread();// ZMQ PUB, Publishes the current state of the robot at a fixed rate
     void gripperPublishThread();// ZMQ PUB, Publishes the current gripper state at a fixed rate
     void responseSocketThread();// ZMQ REP,responds to incoming requests from clients
     void controlLoopThread();// Main control loop for processing commands and updating the robot state
-    
+    void stateSubscribeThread();// ZMQ SUB, Subscribes to the state updates from a leader robot (for follower mode)
+    void gripperSubscribeThread();// ZMQ SUB, Subscribes to the gripper updates
     // Message handling
-    void handleServiceRequest(const std::vector<uint8_t>& request, std::vector<uint8_t>& response) 
+    void handleServiceRequest(const std::vector<uint8_t>& request, std::vector<uint8_t>& response) ;
     
     
 private:
@@ -63,7 +71,7 @@ private:
     std::string gripper_pub_addr_;
     std::string state_sub_addr_;
     std::string gripper_sub_addr_;
-    bool follower_ = false;
+    std::string follower_ = "false";
     // Franka robot
     std::shared_ptr<franka::Robot> robot_;
     std::shared_ptr<franka::Model> model_;
@@ -73,6 +81,8 @@ private:
     // ZMQ communication
     zmq::context_t context_;
     zmq::socket_t pub_socket_;
+    zmq::socket_t pub_arm_socket_;
+    zmq::socket_t pub_gripper_socket_;
     zmq::socket_t sub_socket_;
     zmq::socket_t rep_socket_;
     

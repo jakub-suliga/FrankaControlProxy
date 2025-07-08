@@ -1,5 +1,5 @@
 #include "zero_torque_mode.hpp"
-void start() override {
+void ZeroTorqueMode::start() {
         is_running_ = true;
         std::cout << "[ZeroTorqueMode] Started.\n";
         if (!robot_ || !model_) {
@@ -48,7 +48,7 @@ void start() override {
         std::cout << "[ZeroTorqueMode] Exited.\n";
     }
 
-    void stop() override {
+    void ZeroTorqueMode::stop() {
         is_running_ = false;
         std::cout << "[ZeroTorqueMode] Stopping Zero Torque mode." << std::endl;
     }

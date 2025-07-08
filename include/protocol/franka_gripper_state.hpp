@@ -30,10 +30,10 @@ class FrankaGripperState {
 	static FrankaGripperState gripper_decode(const uint8_t* buffer, size_t size);
 
 	//Upstate from SDK
-	 static FrankaGripperState fromGripperState(const franka::GripperState& gripper_state);
+	static FrankaGripperState fromGripperState(const franka::GripperState& gripper_state);
 	 
 	//Transfer to SDK(for follower)
-	franka::GripperState toGripperState(const FrankaGripperState& state)
+	franka::GripperState toGripperState() const;
 };
 
 

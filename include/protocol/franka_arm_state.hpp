@@ -36,10 +36,10 @@ class FrankaArmState {
 	static FrankaArmState decode(const uint8_t* buffer, size_t size);
 
 	//Upstate from SDK
-	 static FrankaArmState fromRobotState(const franka::RobotState& robot_state);
+	static FrankaArmState fromRobotState(const franka::RobotState& robot_state);
 
 	//Transfer to SDK(for follower)
-	franka::RobotState toRobotState(const FrankaArmState& state);
+	franka::RobotState toRobotState() const;
 
 };
 
