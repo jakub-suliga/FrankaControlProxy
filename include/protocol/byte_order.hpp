@@ -31,7 +31,7 @@ inline uint32_t to_big_endian_u32(uint32_t val) {
 #if defined(_WIN32) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
     return bswap32(val);
 #else
-    return val;
+    return val; 
 #endif
 }
 
@@ -42,6 +42,22 @@ inline uint32_t from_big_endian_u32(uint32_t val) {
     return val;
 #endif
 }
+
+//uint16
+inline uint16_t to_big_endian_u16(uint16_t val) {   
+#if defined(_WIN32) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+    return bswap16(val);
+#else
+    return val;
+#endif
+} 
+
+inline uint16_t from_big_endian_u16(uint16_t val) {
+#if defined(_WIN32) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+    return bswap16(val);
+#else
+    return val;
+#endif
 
 //double 
 inline double to_big_endian_f64(double val) {

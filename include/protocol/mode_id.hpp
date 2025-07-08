@@ -18,7 +18,7 @@ inline std::string toString(ModeID mode) {
     switch (mode) {
         case ModeID::IDLE: return "idle";
         case ModeID::JOINT_VELOCITY: return "joint_velocity";
-        default: return "unknown";
+        default: return "idle";
     }
 }
 
