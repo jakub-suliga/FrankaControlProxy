@@ -63,4 +63,25 @@ FrankaArmState FrankaArmState::fromRobotState(const franka::RobotState& rs) {
     return state;
 }
 
+franka::RobotState toRobotState(const FrankaArmState& state) {
+    franka::RobotState rs;
+
+    // transfer timestamp(need to test)
+    rs.time = franka::Duration(state.timestamp_ms * 1000000); // ms → ns
+
+    std::copy(state.q.begin(), state.q.end(), rs.q.begin());
+    std::copy(state.q_d.begin(), state.q_d.end(), rs.q_d.begin());
+    std::copy(state.dq.begin(), state.dq.end(), rs.dq.begin());
+    std::copy(state.dq_d.begin(), state.dq_d.end(), rs.dq_d.begin());
+    std::copy(state.tau_ext_hat_filtered.begin(), state.tau_ext_hat_filtered.end(), rs.tau_ext_hat_filtered.begin());
+
+    std::copy(state.O_T_EE.begin(), state.O_T_EE.end(), rs.O_T_EE.begin());
+    std::copy(state.O_T_EE_d.begin(), state.O_T_EE_d.end(), rs.O_T_EE_d.begin());
+    std::copy(state.O_F_ext_hat_K.begin(), state.O_F_ext_hat_K.end(), rs.O_F_ext_hat_K.begin());
+    std::copy(state.K_F_ext_hat_K.begin(), state.K_F_ext_hat_K.end(), rs.K_F_ext_hat_K.begin());
+
+    return rs;
+}
+
+
 }  // namespace protocol
