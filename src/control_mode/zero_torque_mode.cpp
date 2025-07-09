@@ -11,7 +11,7 @@ void ZeroTorqueMode::start() {
             {{100.0, 100.0, 100.0, 100.0, 100.0, 300.0, 300.0}},
             {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
             {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}});
-        std::function<franka::Torques(const franka::RobotState&, franka::Duration)> torque_callback =
+        std::function<franka::Torques(const franka::RobotState&, franka::Duration)> joint_torque_callback =
             [this](const franka::RobotState& state, franka::Duration) -> franka::Torques {
                 if (!is_running_) {
                     throw franka::ControlException("ZeroTorqueControlMode stopped.");
@@ -34,13 +34,15 @@ void ZeroTorqueMode::start() {
         } else {
             std::cout << "[ZeroTorqueMode] No leader state available." << std::endl;
         }
-                std::array<double, 7> zero_torque = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-                return franka::Torques(zero_torque);
+                // std::array<double, 7> zero_torque = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+                // return zero_torque;
+                return model_->gravity(state);
             };
+            
 
         //start control callback
         try {
-            robot_->control(torque_callback);
+            robot_->control(joint_torque_callback);
         } catch (const franka::Exception& e) {
             std::cerr << "[ZeroTorqueMode] Exception: " << e.what() << std::endl;
         }

@@ -37,11 +37,13 @@ FrankaProxy::FrankaProxy(const std::string& config_path)
     pub_socket_(context_, ZMQ_PUB), 
     sub_socket_(context_, ZMQ_SUB), 
     rep_socket_(context_, ZMQ_REP), 
-    in_control_(false) {
-    initialize(config_path);
-}
+    in_control_(false) 
+    {
+        initialize(config_path);
+    }
 
 void FrankaProxy::initialize(const std::string& filename) {
+    
     RobotConfig config(filename);
     type_ = config.getValue("type", "Arm"); // Default to "Arm" if not specified
     robot_ip_ = config.getValue("robot_ip");
@@ -51,17 +53,22 @@ void FrankaProxy::initialize(const std::string& filename) {
     if (type_ == "Arm")
     {
         state_pub_addr_ = config.getValue("state_pub_addr");
+        std::cout<<"state_pub"<<state_pub_addr_ <<std::endl;
         pub_socket_.bind(state_pub_addr_);
         service_addr_ = config.getValue("service_addr");
+        //std::cout<<"service_addr"<<service_addr_ <<std::endl;
         rep_socket_.bind(service_addr_);
         robot_ = std::make_shared<franka::Robot>(robot_ip_);
         model_ = std::make_shared<franka::Model>(robot_->loadModel());
+        
         if(follower_ == "true" || follower_ == "True"){
-            state_sub_addr_ = config.getValue("state_sub_addr");
+            state_sub_addr_ = config.getValue("sub_addr");
+            std::cout<<"sub_addr"<<state_sub_addr_  <<std::endl;
             std::cout << "[FrankaProxy] Initializing Arm Follower Proxy with IP: " << robot_ip_ << std::endl;
             sub_socket_.connect(state_sub_addr_);
             state_sub_thread_ = std::thread(&FrankaProxy::stateSubscribeThread, this);
             leader_state_ = default_state;
+            //std::cout<<leader_state_;
         } else {
             std::cout << "[FrankaProxy] Initializing Arm Leader Proxy with IP: " << robot_ip_ << std::endl;
         }
@@ -74,7 +81,7 @@ void FrankaProxy::initialize(const std::string& filename) {
         rep_socket_.bind(service_addr_);
         gripper_ = std::make_shared<franka::Gripper>(robot_ip_);
         if(follower_ == "true" || follower_ == "True"){
-            gripper_sub_addr_ = config.getValue("gripper_sub_addr");
+            gripper_sub_addr_ = config.getValue("sub_addr");
             std::cout << "[FrankaProxy] Initializing Gripper Follower Proxy with IP: " << robot_ip_ << std::endl;
             sub_socket_.connect(gripper_sub_addr_);
             gripper_sub_thread_ = std::thread(&FrankaProxy::gripperSubscribeThread, this);
@@ -87,6 +94,7 @@ void FrankaProxy::initialize(const std::string& filename) {
     }
     else
     {
+
         throw std::runtime_error("Unsupported type in config: " + type_);
     }
 
@@ -99,9 +107,11 @@ FrankaProxy::~FrankaProxy() {
 ////basic function
 //start and initialize threads
 bool FrankaProxy::start() {
+    std::cout<<"go start!"<<std::endl;
     in_control_ = true;
     if (type_ == "Arm") {
         if(follower_ == "true" || follower_ == "True") {
+            std::cout<<"go sub!"<<std::endl;
             state_sub_thread_ = std::thread(&FrankaProxy::stateSubscribeThread, this);
             std::cout << "done arm sub"<< std::endl;
         } 
@@ -127,12 +137,12 @@ bool FrankaProxy::startArm(){
     current_state_ = robot_->readOnce();
     state_pub_thread_ = std::thread(&FrankaProxy::statePublishThread, this);
     std::cout << "done arm pub"<< std::endl;
+    {
+        std::lock_guard<std::mutex> lock(control_mutex_);
+        current_mode_ = control_modes_map_["idle"].get();
+    }
     control_thread_ = std::thread(&FrankaProxy::controlLoopThread, this);
     std::cout << "done control loop"<< std::endl;
-    {
-    std::lock_guard<std::mutex> lock(control_mutex_);
-    current_mode_ = control_modes_map_["idle"].get();
-    }
 
     service_thread_ = std::thread(&FrankaProxy::responseSocketThread, this);
     std::cout << "done service"<< std::endl;
@@ -168,7 +178,7 @@ void FrankaProxy::stopArm() {
     try {
         pub_socket_.close();
         rep_socket_.close();
-        sub_socket_.close();
+        if(follower_ == "true" || follower_ == "True") sub_socket_.close();
     } catch (const zmq::error_t& e) {
         std::cerr << "[ZMQ ERROR] " << e.what() << "\n";
     }
@@ -189,7 +199,7 @@ void FrankaProxy::stopGripper() {
     try {
         pub_socket_.close();
         rep_socket_.close();
-        sub_socket_.close();
+        if(follower_ == "true" || follower_ == "True") sub_socket_.close();
     } catch (const zmq::error_t& e) {
         std::cerr << "[ZMQ ERROR] " << e.what() << "\n";
     }
@@ -251,7 +261,7 @@ void FrankaProxy::statePublishThread() {
         auto msg = protocol::encodeStateMessage(proto_state);
         //debug:check with the message
         //protocol::debugPrintFrankaArmStateBuffer(msg);
-        pub_arm_socket_.send(zmq::buffer(msg), zmq::send_flags::none);
+        pub_socket_.send(zmq::buffer(msg), zmq::send_flags::none);
         //auto t_end = std::chrono::high_resolution_clock::now();
         //auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(t_end - t_start).count();
         //check the speed of decode and pack the message
@@ -272,7 +282,7 @@ void FrankaProxy::gripperPublishThread() {
         auto t_end = std::chrono::high_resolution_clock::now();
         auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(t_end - t_start).count();
         //check the speed of decode and pack the message
-        std::cout << "[FrankaProxy] encodeGripperMessage took " << duration_us << " us" << std::endl;
+        //std::cout << "[FrankaProxy] encodeGripperMessage took " << duration_us << " us" << std::endl;
         //std::this_thread::sleep_for(std::chrono::milliseconds(1000 / GRIPPER_PUB_RATE_HZ));
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
@@ -281,14 +291,18 @@ void FrankaProxy::gripperPublishThread() {
 /// subscribe threads(just for follower)
 void FrankaProxy::stateSubscribeThread() {
     sub_socket_.set(zmq::sockopt::subscribe, ""); // Subscribe to all messages
+    sub_socket_.set(zmq::sockopt::rcvtimeo, 1000); 
     while (in_control_) {
         try{
             zmq::message_t message;
+            //std::cout<<"ja bis hier"<<std::endl;
             auto result = sub_socket_.recv(message, zmq::recv_flags::none);
+            std::cout<<"ja bis hier"<<std::endl;
             if (!result) {
                 std::cerr << "[FrankaProxy] Failed to receive state message." << std::endl;
                 continue; // Skip this iteration if no message received
             }
+            
             std::vector<uint8_t> data(static_cast<uint8_t*>(message.data()), static_cast<uint8_t*>(message.data()) + message.size());
             // Debug: Print the received message size
             std::cout << "[FrankaProxy] Received state update: size = " << data.size() << std::endl;
@@ -315,23 +329,25 @@ void FrankaProxy::stateSubscribeThread() {
 
 
 void FrankaProxy::gripperSubscribeThread() {
-    sub_socket_.set(zmq::sockopt::subscribe, ""); // Subscribe to all messages 
-    try{
-        zmq::message_t message;
-        auto result = sub_socket_.recv(message, zmq::recv_flags::none);
-        if(!result) std::cerr << "[FrankaProxy] Failed to receive gripper message." << std::endl;
-        std::vector<uint8_t> data(static_cast<uint8_t*>(message.data()), static_cast<uint8_t*>(message.data()) + message.size());
-        // Debug: Print the received message size
-        std::cout << "[FrankaProxy] Received gripper update: size = " << data.size() << std::endl;
-        protocol::FrankaGripperState gripper_state;
-        if (protocol::decodeGripperMessage(data, gripper_state)) {
-            leader_gripper_state_ = gripper_state.toGripperState(); // Convert to GripperState for follower
-            std::cout << "[FrankaProxy] Received gripper update from leader." << std::endl;
-        } else {
-            std::cerr << "[FrankaProxy] Failed to decode gripper message." << std::endl;
+    sub_socket_.set(zmq::sockopt::subscribe, ""); // Subscribe to all message
+    while (in_control_) { 
+        try{
+            zmq::message_t message;
+            auto result = sub_socket_.recv(message, zmq::recv_flags::none);
+            if(!result) std::cerr << "[FrankaProxy] Failed to receive gripper message." << std::endl;
+            std::vector<uint8_t> data(static_cast<uint8_t*>(message.data()), static_cast<uint8_t*>(message.data()) + message.size());
+            // Debug: Print the received message size
+            std::cout << "[FrankaProxy] Received gripper update: size = " << data.size() << std::endl;
+            protocol::FrankaGripperState gripper_state;
+            if (protocol::decodeGripperMessage(data, gripper_state)) {
+                leader_gripper_state_ = gripper_state.toGripperState(); // Convert to GripperState for follower
+                std::cout << "[FrankaProxy] Received gripper update from leader." << std::endl;
+            } else {
+                std::cerr << "[FrankaProxy] Failed to decode gripper message." << std::endl;
+            }
+        }catch (const zmq::error_t& e) {
+            std::cerr << "[FrankaProxy] ZMQ recv error: " << e.what() << std::endl;
         }
-    }catch (const zmq::error_t& e) {
-        std::cerr << "[FrankaProxy] ZMQ recv error: " << e.what() << std::endl;
     }
 }
 
@@ -483,7 +499,7 @@ void FrankaProxy::handleServiceRequest(const std::vector<uint8_t>& request, std:
                     gripper_->stop(); // Stop the gripper
                     std::cout << "Gripper stop command received." << std::endl;
                 } else if (command == 1) {
-                    gripper_->move(0.08, 0.05); // Move gripper to 8cm with speed 5cm/s
+                    gripper_->move(0.01, 0.01); // Move gripper to 8cm with speed 5cm/s
                     std::cout << "Gripper move command received." << std::endl;
                 } else {
                     resp = encodeErrorMessage(0x05); // Invalid command
