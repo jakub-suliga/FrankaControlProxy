@@ -18,10 +18,27 @@ void IdleControlMode::start() {
             } catch (const franka::Exception& e) {
                 std::cerr << "[IdleMode] readOnce() failed: " << e.what() << std::endl;
             }
+        //     // test get leader state
+        //     auto leader_ptr = getLeaderState();
+        //     if (leader_ptr) {
+        //     const auto& leader = *leader_ptr;
+
+        //     // print leader state
+        //     std::cout << "[Leader q] ";
+        //     for (double q_i : leader.q) {
+        //         std::cout << q_i << " ";
+        //     }
+        //     std::cout << std::endl;
+        // } else {
+        //     std::cout << "No leader state available." << std::endl;
+        // }
 }
     std::cout << "[IdleControlMode] Exited.\n";
 }
 void IdleControlMode::stop() {
     is_running_ = false;
     std::cout << "[IdleControlMode] Stopping idle mode." << std::endl;
+}
+int IdleControlMode::getModeID() const {
+    return 5; // Return a unique ID for the idle mode
 }

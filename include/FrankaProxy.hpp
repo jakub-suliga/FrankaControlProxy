@@ -80,10 +80,12 @@ private:
     
     // ZMQ communication
     zmq::context_t context_;
-    zmq::socket_t pub_socket_;
-    //zmq::socket_t pub_arm_socket_;
-    //zmq::socket_t pub_gripper_socket_;
-    zmq::socket_t sub_socket_;
+    //zmq::socket_t pub_socket_;
+    zmq::socket_t pub_arm_socket_;
+    zmq::socket_t pub_gripper_socket_;
+    //zmq::socket_t sub_socket_;
+    zmq::socket_t sub_arm_socket_;
+    zmq::socket_t sub_gripper_socket_;
     zmq::socket_t rep_socket_;
     
     // Threading

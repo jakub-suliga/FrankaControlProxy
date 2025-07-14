@@ -39,7 +39,7 @@ def sub_thread(name, addr):
     socket.setsockopt(zmq.SUBSCRIBE, b"")  # all messages
     while True:
         msg = socket.recv()
-        print(f"[{name}] received {len(msg)} bytes")
+        # print(f"[{name}] received {len(msg)} bytes")
         #todo:add msg parsing and printing
 
 threading.Thread(target=sub_thread, args=("ArmState", ARM_SUB_ADDR), daemon=True).start()

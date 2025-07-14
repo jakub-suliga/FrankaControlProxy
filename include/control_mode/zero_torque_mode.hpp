@@ -19,6 +19,7 @@ public:
     //void initialize(const franka::RobotState& initial_state) override;
     void start() override;
     void stop() override;
+    int getModeID() const override;
 };
 
 #endif // ZERO_TORQUE_MODE_HPP

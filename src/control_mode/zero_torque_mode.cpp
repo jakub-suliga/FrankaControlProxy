@@ -1,57 +1,51 @@
+
 #include "zero_torque_mode.hpp"
+#include <franka/exception.h>
+#include <iostream>
 void ZeroTorqueMode::start() {
-        is_running_ = true;
-        std::cout << "[ZeroTorqueMode] Started.\n";
-        if (!robot_ || !model_) {
-            std::cerr << "[ZeroTorqueMode] Robot or model not set.\n";
-            return;
-        }
-        robot_->setCollisionBehavior(
-            {{100.0, 100.0, 100.0, 100.0, 100.0, 300.0, 300.0}},
-            {{100.0, 100.0, 100.0, 100.0, 100.0, 300.0, 300.0}},
-            {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
-            {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}});
-        std::function<franka::Torques(const franka::RobotState&, franka::Duration)> joint_torque_callback =
-            [this](const franka::RobotState& state, franka::Duration) -> franka::Torques {
-                if (!is_running_) {
-                    throw franka::ControlException("ZeroTorqueControlMode stopped.");
-                }
-
-                setCurrentState(state);
-
-
-            // test get leader state
-            auto leader_ptr = getLeaderState();
-            if (leader_ptr) {
-            const auto& leader = *leader_ptr;
-
-            // print leader state
-            std::cout << "[Leader q] ";
-            for (double q_i : leader.q) {
-                std::cout << q_i << " ";
+    is_running_ = true;
+    std::cout << "[ZeroTorqueMode] Started.\n";
+    if (!robot_ || !model_) {
+        std::cerr << "[ZeroTorqueMode] Robot or model not set.\n";
+        return;
+    }
+    robot_->setCollisionBehavior(
+        {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
+        {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
+        {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
+        {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}});
+    robot_->automaticErrorRecovery();
+    std::function<franka::Torques(const franka::RobotState&, franka::Duration)> callback =
+        [this](const franka::RobotState& state, franka::Duration) -> franka::Torques {
+            if (!is_running_) {
+                return franka::Torques({0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0});
             }
-            std::cout << std::endl;
-        } else {
-            std::cout << "[ZeroTorqueMode] No leader state available." << std::endl;
-        }
-                // std::array<double, 7> zero_torque = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-                // return zero_torque;
-                return model_->gravity(state);
-            };
-            
-
-        //start control callback
+            setCurrentState(state);
+            std::array<double, 7> damping_torque{};
+            for (size_t i = 0; i < 7; ++i) {
+                damping_torque[i] = -0.5 * state.dq[i];  // 0.5 Nm·s/rad
+            }
+            return franka::Torques(damping_torque);
+        };
+    try {
+        robot_->control(callback);
+    } catch (const franka::ControlException& e) {
+        std::cerr << "[ZeroTorqueMode] Exception: " << e.what() << std::endl;
+    if (std::string(e.what()).find("reflex") != std::string::npos) {
+        std::cout << "Reflex detected, attempting automatic recovery...\n";
         try {
-            robot_->control(joint_torque_callback);
-        } catch (const franka::Exception& e) {
-            std::cerr << "[ZeroTorqueMode] Exception: " << e.what() << std::endl;
+            robot_->automaticErrorRecovery();
+        } catch (const franka::Exception& recovery_error) {
+            std::cerr << "Recovery failed: " << recovery_error.what() << std::endl;
         }
-
-        std::cout << "[ZeroTorqueMode] Exited.\n";
     }
-
-    void ZeroTorqueMode::stop() {
-        is_running_ = false;
-        std::cout << "[ZeroTorqueMode] Stopping Zero Torque mode." << std::endl;
-    }
-
+}
+    std::cout << "[ZeroTorqueMode] Exited.\n";
+}
+void ZeroTorqueMode::stop() {
+    is_running_ = false;
+    std::cout << "[ZeroTorqueMode] Stopping Zero Torque mode.\n";
+}
+int ZeroTorqueMode::getModeID() const {
+    return 4;
+}

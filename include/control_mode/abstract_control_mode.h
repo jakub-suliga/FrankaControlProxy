@@ -16,7 +16,8 @@ public:
     //virtual void initialize(const RobotState& initial_state);
     virtual void start() = 0;
     virtual void stop() = 0;
-
+    // Get the mode ID for this control mode
+    virtual int getModeID() const = 0; // Return the mode ID as an integer
     void setRobot(std::shared_ptr<franka::Robot> robot) {
         robot_ = std::move(robot);
     }

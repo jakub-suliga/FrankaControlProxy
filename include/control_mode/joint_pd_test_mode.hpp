@@ -13,6 +13,7 @@ public:
 
     void start() override;
     void stop() override;
+    int getModeID() const override;
 };
 
 #endif // JOINT_PD_CONTROL_TEST_HPP

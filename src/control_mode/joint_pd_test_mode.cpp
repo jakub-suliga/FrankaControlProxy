@@ -13,9 +13,9 @@ void JointPDControlMode::start() {
         std::cerr << "[JointPDControlMode] Robot or model not set.\n";
         return;
     }
-
-    const std::array<double, 7> Kp = {60.0, 60.0, 60.0, 50.0, 20.0, 10.0, 10.0};
-    const std::array<double, 7> Kd = {5.0, 5.0, 5.0, 3.0, 1.0, 0.5, 0.5};
+    robot_->automaticErrorRecovery();
+    const std::array<double, 7> Kp = {700.0, 700.0, 700.0, 600.0, 300.0, 300.0, 250.0};
+    const std::array<double, 7> Kd = {50.0, 50.0, 50.0, 50.0, 25.0, 25, 15};
 
     std::function<franka::Torques(const franka::RobotState&, franka::Duration)> torque_callback =
         [this, Kp, Kd](const franka::RobotState& state, franka::Duration) -> franka::Torques {
@@ -44,13 +44,25 @@ void JointPDControlMode::start() {
 
     try {
         robot_->control(torque_callback);
-    } catch (const franka::Exception& e) {
+    } catch (const franka::ControlException& e) {
         std::cerr << "[JointPDControlMode] Exception: " << e.what() << std::endl;
+    if (std::string(e.what()).find("reflex") != std::string::npos) {
+        std::cout << "Reflex detected, attempting automatic recovery...\n";
+        try {
+            robot_->automaticErrorRecovery();
+        } catch (const franka::Exception& recovery_error) {
+            std::cerr << "Recovery failed: " << recovery_error.what() << std::endl;
+        }
     }
+}
 
     std::cout << "[JointPDControlMode] Exited.\n";
 }
 
 void JointPDControlMode::stop() {
     is_running_ = false;
+}
+
+int JointPDControlMode::getModeID() const {
+    return 6; // Return a unique ID for the Joint PD control mode
 }
